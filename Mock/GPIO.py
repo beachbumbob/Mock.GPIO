@@ -6,6 +6,7 @@ import time
 import logging
 import os
 import yaml
+import PiBoard
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +64,7 @@ class Channel:
         self.chanel = channel
         self.direction = direction
         self.initial = initial
+        self.current = initial
         self.pull_up_down = pull_up_down
 
 
@@ -73,6 +75,9 @@ def setmode(mode):
     BOARD - Use Raspberry Pi board numbers
     BCM   - Use Broadcom GPIO 00..nn numbers
     """
+    
+    board = getBoard()
+    
     # GPIO = GPIO()
     time.sleep(1)
     if(mode == BCM):
@@ -89,12 +94,14 @@ def getmode():
     Get numbering mode used for channel numbers.
     Returns BOARD, BCM or None
     """
+    board = getBoard()
     return _mode
 
 def setwarnings(flag):
     """
     Enable or disable warning messages
     """
+    board = getBoard()
     logger.info("Set Warings as {}".format(flag))
 
 def setup(channel, direction, initial=0,pull_up_down=PUD_OFF):
@@ -107,8 +114,10 @@ def setup(channel, direction, initial=0,pull_up_down=PUD_OFF):
 
     """
     logger.info("setup channel : {} as {} with intial :{} and pull_up_dowm {}".format(channel,direction,initial,pull_up_down))
+    board = getBoard()
     global channel_config
     channel_config[channel] = Channel(channel, direction, initial, pull_up_down)
+    board.setChannelConfig(channel_config[channel])
 
 def output(channel, value):
     """
@@ -117,6 +126,7 @@ def output(channel, value):
     value   - 0/1 or False/True or LOW/HIGH
 
     """
+    board = getBoard()
     logger.info("output channel : {} with value : {}".format(channel, value))
 
 def input(channel):
@@ -124,6 +134,7 @@ def input(channel):
     Input from a GPIO channel.  Returns HIGH=1=True or LOW=0=False
     channel - either board pin number or BCM number depending on which mode is set.
     """
+    board = getBoard()
     logger.info("reading from chanel {}".format(channel))
 
 def wait_for_edge(channel,edge,bouncetime,timeout):
@@ -134,6 +145,7 @@ def wait_for_edge(channel,edge,bouncetime,timeout):
     [bouncetime] - time allowed between calls to allow for switchbounce
     [timeout]    - timeout in ms
     """
+    board = getBoard()
     logger.info("waiting for edge : {} on channel : {} with bounce time : {} and Timeout :{}".format(edge,channel,bouncetime,timeout))
 
 
@@ -145,6 +157,8 @@ def add_event_detect(channel,edge,callback,bouncetime):
     [callback]   - A callback function for the event (optional)
     [bouncetime] - Switch bounce timeout in ms for callback
     """
+#     board = 
+    getBoard().setChannelEvent(channel, edge, callback)
     logger.info("Event detect added for edge : {} on channel : {} with bouce time : {} and callback {}".format(edge,channel,bouncetime,callback))
 
 def event_detected(channel):
@@ -152,6 +166,7 @@ def event_detected(channel):
     Returns True if an edge has occurred on a given GPIO.  You need to enable edge detection using add_event_detect() first.
     channel - either board pin number or BCM number depending on which mode is set.
     """
+    board = getBoard()
     logger.info("Waiting for even detection on channel :{}".format(channel))
 
 def add_event_callback(channel,callback):
@@ -167,6 +182,7 @@ def remove_event_detect(channel):
     Remove edge detection for a particular GPIO channel
     channel - either board pin number or BCM number depending on which mode is set.
     """
+    board = getBoard()
     logger.info("Event Detect Removed for channel : {}".format(channel))
 
 def gpio_function(channel):
@@ -174,6 +190,7 @@ def gpio_function(channel):
     Return the current GPIO function (IN, OUT, PWM, SERIAL, I2C, SPI)
     channel - either board pin number or BCM number depending on which mode is set.
     """
+    board = getBoard()
     logger.info("GPIO function of Channel : {} is {}".format(channel,channel_config[channel].direction))
 
 
@@ -188,6 +205,7 @@ class PWM:
         self.dutycycle = 0
         global channel_config
         channel_config[channel] = Channel(channel,PWM,)
+        board = getBoard()
         logger.info("Initialized PWM for Channel : {} at frequency : {}".format(channel,frequency))
     
     # where dc is the duty cycle (0.0 <= dc <= 100.0)
@@ -197,6 +215,7 @@ class PWM:
         dutycycle - the duty cycle (0.0 to 100.0)
         """
         self.dutycycle = dutycycle
+        board = getBoard()
         logger.info("start pwm on channel : {} with Duty cycle : {}".format(self.chanel,dutycycle))
     
     # where freq is the new frequency in Hz
@@ -205,6 +224,7 @@ class PWM:
         Change the frequency
         frequency - frequency in Hz (freq > 1.0)
         """
+        board = getBoard()
         logger.info("Freqency Changed for channel : {} from : {} -> to : {}".format(self.chanel,self.frequency,frequency))
         self.frequency = frequency
 
@@ -214,11 +234,13 @@ class PWM:
         Change the duty cycle
         dutycycle - between 0.0 and 100.0
         """
+        board = getBoard()
         self.dutycycle = dutycycle
         logger.info("Dutycycle Changed for channel : {} from : {} -> to : {}".format(self.chanel,self.dutycycle,dutycycle))
     
     # stop PWM generation
     def stop(self):
+        board = getBoard()
         logger.info("Stop pwm on channel : {} with Duty cycle : {}".format(self.chanel,self.dutycycle))
 
 
@@ -227,7 +249,15 @@ def cleanup(channel=None):
     Clean up by resetting all GPIO channels that have been used by this program to INPUT with no pullup/pulldown and no event detection
     [channel] - individual channel or list/tuple of channels to clean up.  Default - clean every channel that has been used.
     """
+    board = getBoard()
     if channel is not None:
         logger.info("Cleaning Up Channel : {}".format(channel))
     else:
         logger.info("Cleaning Up all channels")
+        
+def getBoard():
+    rpib = PiBoard.Board.getInstance()
+    if rpib == None:
+        rpib = PiBoard.Board()
+    return rpib
+   
