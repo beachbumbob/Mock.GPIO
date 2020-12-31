@@ -3,6 +3,8 @@ import threading
 import time
 import socket as sk
 
+# TODO: "Remove" all __X
+
 class Board:
     channelConfigs = None
     channelEvents = None
@@ -29,19 +31,15 @@ class Board:
             
            
     def piBoardCallback(__X, val):
-        print "piBoardCallback"
         
         global channelEvents
         # This assumes that val is in format {channel:[HI|LOW]}
         x = val.split(":")
-        print(val)
         channel = x[0]
         edge = x[1]
-        print(channel)
-        print(edge)
         
         event = Board.__instance.channelEvents[int(channel)]
-        print(event.eventCallback)
+        # TODO: Handle logic on wheter to call event callback or not.
         event.eventCallback(event)
     
     def setChannelConfig(self, channel):
@@ -50,7 +48,6 @@ class Board:
         
     def setChannelEvent(__X,channel, _edge, _channelEventCallback):
         if channel != None:
-            print("setChannelEvent")
             event = Event(_edge,_channelEventCallback)
             Board.__instance.channelEvents[channel] = event
    
@@ -62,7 +59,6 @@ class Event:
     def __init__(self,_edge,_eventCallback):
         self.eventCallback = _eventCallback
         self.edge = _edge
-        print(self)
     
     def getEventCallback(self):
         return self.eventCallback
@@ -75,7 +71,7 @@ class Service:
     serviceThreadCallback = None
  
     def __init__(self):
-        print "Service __init__"
+        print(self)
         
     def listen(self,_serviceThreadCallback):
         global serviceThreadCallback
@@ -129,13 +125,8 @@ class ServiceThread:
     def setPiBoardCallback(__X, _piBoardCallback):
         global piBoardCallback
         piBoardCallback = _piBoardCallback
- 
-#     def getPiBoardCallback():
-#         return self.piBoardCallback
-        
+         
     def threadify(self):
-        print("threadify")
-        print(self)
         global thread
         thread = threading.Thread(target=self.run)
         thread.daemon = True  # Daemonize thread
