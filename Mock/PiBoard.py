@@ -4,8 +4,8 @@ import time
 import socket as sk
 
 class Board:
-    channelConfigs = {}
-    channelEvents = {}
+    channelConfigs = None
+    channelEvents = None
     __instance = None
     serviceThread = None
     
@@ -21,14 +21,14 @@ class Board:
             raise Exception("This class is a singleton!")
         else:
             Board.__instance = self
-
-#             global serviceThread
+            Board.__instance.channelEvents = {}
+            Board.__instance.channelConfigs = {}
             Board.__instance.serviceThread = ServiceThread()
-#             serviceThread.piBoardCallback = piBoardCallback
             Board.__instance.serviceThread.setPiBoardCallback(Board.__instance.piBoardCallback)
             Board.__instance.serviceThread.threadify()
+            
            
-    def piBoardCallback(val):
+    def piBoardCallback(__X, val):
         print "piBoardCallback"
         
         global channelEvents
@@ -40,17 +40,19 @@ class Board:
         print(channel)
         print(edge)
         
-        event = channelEvents[channel]
-        print(event)
+        event = Board.__instance.channelEvents[int(channel)]
+        print(event.eventCallback)
+        event.eventCallback(event)
     
     def setChannelConfig(self, channel):
         if channel != None:
-            self.channelConfigs[channel.chanel] = channel
+            Board.__instance.channelConfigs[channel.chanel] = channel
         
-    def setChannelEvent(self, channel, edge, eventCallback):
+    def setChannelEvent(__X,channel, _edge, _channelEventCallback):
         if channel != None:
-            event = Event(edge,eventCallback)
-            self.channelEvents[channel] = Event(edge,eventCallback)
+            print("setChannelEvent")
+            event = Event(_edge,_channelEventCallback)
+            Board.__instance.channelEvents[channel] = event
    
 class Event:
 
@@ -58,16 +60,15 @@ class Event:
     edge = None
 
     def __init__(self,_edge,_eventCallback):
-        global edge
-        global eventCallback
-        edge = _edge
-        eventCallback = _eventCallback 
+        self.eventCallback = _eventCallback
+        self.edge = _edge
+        print(self)
     
-    def getEventCallback():
+    def getEventCallback(self):
         return self.eventCallback
-   
-    def setEventCallback(eventCallback):
-        self.eventCallback = eventCallback
+    
+    def setEventCallback(self,_eventCallback):
+        self.eventCallback = _eventCallback
    
 class Service:
  
@@ -99,7 +100,7 @@ class Service:
                     exit()
     
                 elif data:
-                    serviceThreadCallback(data)
+                    _serviceThreadCallback(data)
                     
                 else:
                     break         
@@ -140,7 +141,7 @@ class ServiceThread:
         thread.daemon = True  # Daemonize thread
         thread.start()  # Start the execution
         
-    def serviceThreadCallback(val):
+    def serviceThreadCallback(__X,val):
         self.piBoardCallback(val)
 
 
