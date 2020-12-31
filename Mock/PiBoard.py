@@ -1,15 +1,15 @@
-import GPIO
+import GPIO as GPIO
+import threading
+import time
+import socket as sk
 
-class Board:
-    channelConfigs= {}
-    channelEvents= {}
+class Board():
+    channelConfigs = {}
+    channelEvents = {}
     __instance = None
+    global serviceThread
+    global piBoardCallback
     
-#     class Event:
-#         def __init__(self,edge, callback):
-#             self.edge = edge
-#             self.callback = callback 
-
     @staticmethod 
     def getInstance():
         """ Static access method. """
@@ -18,51 +18,72 @@ class Board:
         return Board.__instance
     
     def __init__(self):
-        """ Virtually private constructor. """
         if Board.__instance != None:
             raise Exception("This class is a singleton!")
         else:
+            self.serviceThread = ServiceThread()
+            self.serviceThread.piBoardCallback = piBoardCallback
+#             self.serviceThread.setPiBoardCallback(piBoardCallback)
+            self.serviceThread.threadify()
+            
             Board.__instance = self
+            
+           
+    def piBoardCallback(self,val):
+        print "piBoardCallback"
+        # This assumes that val is in format {channel:[HI|LOW]}
+        x = val.split(":")
+        print(val)
+        channel = x[0]
+        edge = x[1]
+        print(channel)
+        print(edge)
+        event = self.channelEvents[channel]
+        print(event)
+#         event.getCallback(x[1])
     
-    def setChannelConfig(self,channel):
+    def setChannelConfig(self, channel):
         if channel != None:
             self.channelConfigs[channel.chanel] = channel
         
-    def setChannelEvent(self,channel,edge,callback):
+    def setChannelEvent(self, channel, edge, eventCallback):
         if channel != None:
-            self.channelEvents[channel] = Event.Event(edge,callback)
-        
+            event = Event(edge,eventCallback)
+            self.channelEvents[channel] = Event(edge,eventCallback)
+#             self.channelEvents[channel].setEventCallback = eventCallback
    
-   
-class Event(object):
+# class Event(object):
+class Event:
     '''
     classdocs
     '''
 
-    def __init__(self,edge, callback):
+    global eventCallback
+    global edge
+
+    def __init__(self,edge,eventCallback):
         '''
         Constructor
         '''
         self.edge = edge
-        self.callback = callback 
- 
+        self.eventCallback = eventCallback 
+    
+    def getEventCallback():
+        return self.eventCallback
    
-class service(object):
-    '''
-    classdocs
-    '''
-    global callback
+    def setEventCallback(eventCallback):
+        self.eventCallback = eventCallback
+   
+# class Service(object):
+class Service:
+
+    global serviceThreadCallback
  
     def __init__(self):
-        '''
-        Constructor
-        '''
-#         self.callback = callback
-      
-    def listen(self,callback):
-#     def listen(self):
-#     def listen():
-        self.callback = callback
+        print "Service __init__"
+        
+    def listen(self,serviceThreadCallback):
+        self.serviceThreadCallback = serviceThreadCallback
         connection = sk.socket(sk.AF_INET, sk.SOCK_STREAM)
         connection.setsockopt(sk.SOL_SOCKET, sk.SO_REUSEADDR, 1)
         connection.bind(('0.0.0.0', 5566))
@@ -83,72 +104,56 @@ class service(object):
                     exit()
     
                 elif data:
-                    current_connection.sendall(data)
-#                     print data
-                    cm = self.callback
-                    cm(data) 
+#                     current_connection.sendall(data)
+                    self.serviceThreadCallback(data)
+                    
                 else:
                     break         
     
-    def setCallback(self,callback):
-        self.callback  = callback
+    def setCallback(self, serviceThreadCallback):
+        self.serviceThreadCallback = serviceThreadCallback
         
-    def getCallback(self):
-       return self.callback
+    def getCallback(serviceThreadCallback):
+       return self.serviceThreadCallback
         
-        
-class ServiceThread(object):
+class ServiceThread:
 
-    global callback
+    global piBoardCallback
+    global thread
+    global svc
 
     def __init__(self, interval=1):
         self.interval = interval
 
     def run(self):
+            self.svc = Service()
+            self.svc.listen(self.piBoardCallback)
 
-#         while True:
-            svc = S.service()
-            svc.listen(self.callback)
-
-#         while True:
-#             cm = self.getCallback()
-#             cm(self)
-#             print('Doing something imporant in the background')
-#             time.sleep(self.interval)
-
-    def setCallback(self, callback):
-        self.callback = callback
+    def setPiBoardCallback(piBoardCallback):
+        self.piBoardCallback = piBoardCallback
  
-    def getCallback(self):
-        return self.callback
+    def getPiBoardCallback():
+        return self.piBoardCallback
         
     def threadify(self):
-        thread = threading.Thread(target=self.run)
-        thread.daemon = True  # Daemonize thread
-        thread.start()  # Start the execution
+        self.thread = threading.Thread(target=self.run)
+        self.thread.daemon = True  # Daemonize thread
+        self.thread.start()  # Start the execution
         
-        
+    def serviceThreadCallback(val):
+        self.piBoardCallback(val)
+
 def ext_callback(val):
     print "ext_callback"
     print val        
-        
-        
                 
-# def handler(pin):
-#     print pin
-#          
-# if __name__ == '__main__':
-#     
-#     
-# #GPIO.setmode(GPIO.BCM)
-# #GPIO.setup([redButton, blueButton], GPIO.IN, pull_up_down=GPIO.PUD_UP)   
-# 
-#     
-#     
-#     try:
-#          
-#         GPIO.setmode(GPIO.BCM)
-#         GPIO.setup(22, GPIO.IN, 0, GPIO.PUD_UP)
-#         GPIO.add_event_detect(22, GPIO.FALLING, handler, bouncetime=1500)
-#     except KeyboardInterrupt:
-#         pass      
+if __name__ == '__main__': 
+     
+    try:
+        while True:
+            GPIO.setmode(GPIO.BCM)
+            GPIO.setup(22, GPIO.IN, 0, GPIO.PUD_UP)
+            GPIO.add_event_detect(22, GPIO.FALLING, ext_callback, bouncetime=1500)
+            time.sleep(1000)
+    except KeyboardInterrupt:
+        pass      

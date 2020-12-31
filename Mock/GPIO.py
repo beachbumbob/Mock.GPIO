@@ -5,7 +5,7 @@ Mock Library for RPi.GPIO
 import time
 import logging
 import os
-import yaml
+# import yaml
 import PiBoard
 
 logger = logging.getLogger(__name__)
@@ -146,6 +146,7 @@ def wait_for_edge(channel,edge,bouncetime,timeout):
     [timeout]    - timeout in ms
     """
     board = getBoard()
+    
     logger.info("waiting for edge : {} on channel : {} with bounce time : {} and Timeout :{}".format(edge,channel,bouncetime,timeout))
 
 
