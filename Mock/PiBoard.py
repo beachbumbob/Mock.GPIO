@@ -3,12 +3,11 @@ import threading
 import time
 import socket as sk
 
-class Board():
+class Board:
     channelConfigs = {}
     channelEvents = {}
     __instance = None
-    global serviceThread
-    global piBoardCallback
+    serviceThread = None
     
     @staticmethod 
     def getInstance():
@@ -21,16 +20,18 @@ class Board():
         if Board.__instance != None:
             raise Exception("This class is a singleton!")
         else:
-            self.serviceThread = ServiceThread()
-            self.serviceThread.piBoardCallback = piBoardCallback
-#             self.serviceThread.setPiBoardCallback(piBoardCallback)
-            self.serviceThread.threadify()
-            
             Board.__instance = self
-            
+
+#             global serviceThread
+            Board.__instance.serviceThread = ServiceThread()
+#             serviceThread.piBoardCallback = piBoardCallback
+            Board.__instance.serviceThread.setPiBoardCallback(Board.__instance.piBoardCallback)
+            Board.__instance.serviceThread.threadify()
            
-    def piBoardCallback(self,val):
+    def piBoardCallback(val):
         print "piBoardCallback"
+        
+        global channelEvents
         # This assumes that val is in format {channel:[HI|LOW]}
         x = val.split(":")
         print(val)
@@ -38,9 +39,9 @@ class Board():
         edge = x[1]
         print(channel)
         print(edge)
-        event = self.channelEvents[channel]
+        
+        event = channelEvents[channel]
         print(event)
-#         event.getCallback(x[1])
     
     def setChannelConfig(self, channel):
         if channel != None:
@@ -50,23 +51,17 @@ class Board():
         if channel != None:
             event = Event(edge,eventCallback)
             self.channelEvents[channel] = Event(edge,eventCallback)
-#             self.channelEvents[channel].setEventCallback = eventCallback
    
-# class Event(object):
 class Event:
-    '''
-    classdocs
-    '''
 
-    global eventCallback
-    global edge
+    eventCallback = None
+    edge = None
 
-    def __init__(self,edge,eventCallback):
-        '''
-        Constructor
-        '''
-        self.edge = edge
-        self.eventCallback = eventCallback 
+    def __init__(self,_edge,_eventCallback):
+        global edge
+        global eventCallback
+        edge = _edge
+        eventCallback = _eventCallback 
     
     def getEventCallback():
         return self.eventCallback
@@ -74,16 +69,16 @@ class Event:
     def setEventCallback(eventCallback):
         self.eventCallback = eventCallback
    
-# class Service(object):
 class Service:
-
-    global serviceThreadCallback
+ 
+    serviceThreadCallback = None
  
     def __init__(self):
         print "Service __init__"
         
-    def listen(self,serviceThreadCallback):
-        self.serviceThreadCallback = serviceThreadCallback
+    def listen(self,_serviceThreadCallback):
+        global serviceThreadCallback
+        serviceThreadCallback = _serviceThreadCallback
         connection = sk.socket(sk.AF_INET, sk.SOCK_STREAM)
         connection.setsockopt(sk.SOL_SOCKET, sk.SO_REUSEADDR, 1)
         connection.bind(('0.0.0.0', 5566))
@@ -104,44 +99,50 @@ class Service:
                     exit()
     
                 elif data:
-#                     current_connection.sendall(data)
-                    self.serviceThreadCallback(data)
+                    serviceThreadCallback(data)
                     
                 else:
                     break         
     
-    def setCallback(self, serviceThreadCallback):
-        self.serviceThreadCallback = serviceThreadCallback
+    def setCallback(_serviceThreadCallback):
+        global serviceThreadCallback
+        serviceThreadCallback = _serviceThreadCallback
         
-    def getCallback(serviceThreadCallback):
-       return self.serviceThreadCallback
+#     def getCallback(serviceThreadCallback):
+#         return self.serviceThreadCallback
         
 class ServiceThread:
 
-    global piBoardCallback
-    global thread
-    global svc
+    thread = None
+    svc = None
+    piBoardCallback = None
 
     def __init__(self, interval=1):
         self.interval = interval
 
     def run(self):
+            global piBoardCallback
             self.svc = Service()
-            self.svc.listen(self.piBoardCallback)
+            self.svc.listen(piBoardCallback)
 
-    def setPiBoardCallback(piBoardCallback):
-        self.piBoardCallback = piBoardCallback
+    def setPiBoardCallback(__X, _piBoardCallback):
+        global piBoardCallback
+        piBoardCallback = _piBoardCallback
  
-    def getPiBoardCallback():
-        return self.piBoardCallback
+#     def getPiBoardCallback():
+#         return self.piBoardCallback
         
     def threadify(self):
-        self.thread = threading.Thread(target=self.run)
-        self.thread.daemon = True  # Daemonize thread
-        self.thread.start()  # Start the execution
+        print("threadify")
+        print(self)
+        global thread
+        thread = threading.Thread(target=self.run)
+        thread.daemon = True  # Daemonize thread
+        thread.start()  # Start the execution
         
     def serviceThreadCallback(val):
         self.piBoardCallback(val)
+
 
 def ext_callback(val):
     print "ext_callback"
