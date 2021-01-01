@@ -1,9 +1,9 @@
-import GPIO as GPIO
 import threading
 import time
+
+import GPIO as GPIO
 import socket as sk
 
-# TODO: "Remove" all __X
 
 class Board:
     channelConfigs = None
@@ -28,43 +28,41 @@ class Board:
             Board.__instance.serviceThread = ServiceThread()
             Board.__instance.serviceThread.setPiBoardCallback(Board.__instance.piBoardCallback)
             Board.__instance.serviceThread.threadify()
-            
            
-    def piBoardCallback(__X, val):
+    def piBoardCallback(_piBoardInstance, _value):
         
         global channelEvents
-        # This assumes that val is in format {channel:[HI|LOW]}
-        x = val.split(":")
-        channel = x[0]
-        edge = x[1]
+        # This assumes that val is in format {channel:[HI|LOW]}, i.e. 22:HI
+        values = _value.split(":")
+        channel = values[0]
+        edge = values[1]
         
-        event = Board.__instance.channelEvents[int(channel)]
+        event = _piBoardInstance.channelEvents[int(channel)]
         # TODO: Handle logic on wheter to call event callback or not.
         event.eventCallback(event)
     
-    def setChannelConfig(self, channel):
+    def setChannelConfig(_piBoardInstance, channel):
         if channel != None:
-            Board.__instance.channelConfigs[channel.chanel] = channel
+            _piBoardInstance.channelConfigs[channel.chanel] = channel
         
-    def setChannelEvent(__X,channel, _edge, _channelEventCallback):
-        if channel != None:
-            event = Event(_edge,_channelEventCallback)
-            Board.__instance.channelEvents[channel] = event
-   
+    def setChannelEvent(_piBoardInstance, _channel, _edge, _channelEventCallback):
+        
+        if _channel != None:
+            event = Event(_edge, _channelEventCallback, _channel)
+            _piBoardInstance.channelEvents[_channel] = event
+
+
 class Event:
 
     eventCallback = None
     edge = None
+    channel = None
 
-    def __init__(self,_edge,_eventCallback):
+    def __init__(self, _edge, _eventCallback, _channel):
         self.eventCallback = _eventCallback
         self.edge = _edge
-    
-    def getEventCallback(self):
-        return self.eventCallback
-    
-    def setEventCallback(self,_eventCallback):
-        self.eventCallback = _eventCallback
+        self.channel = _channel
+
    
 class Service:
  
@@ -73,7 +71,7 @@ class Service:
     def __init__(self):
         print(self)
         
-    def listen(self,_serviceThreadCallback):
+    def listen(self, _serviceThreadCallback):
         global serviceThreadCallback
         serviceThreadCallback = _serviceThreadCallback
         connection = sk.socket(sk.AF_INET, sk.SOCK_STREAM)
@@ -104,10 +102,8 @@ class Service:
     def setCallback(_serviceThreadCallback):
         global serviceThreadCallback
         serviceThreadCallback = _serviceThreadCallback
-        
-#     def getCallback(serviceThreadCallback):
-#         return self.serviceThreadCallback
-        
+
+                
 class ServiceThread:
 
     thread = None
@@ -122,7 +118,7 @@ class ServiceThread:
             self.svc = Service()
             self.svc.listen(piBoardCallback)
 
-    def setPiBoardCallback(__X, _piBoardCallback):
+    def setPiBoardCallback(_serviceThread, _piBoardCallback):
         global piBoardCallback
         piBoardCallback = _piBoardCallback
          
@@ -132,13 +128,13 @@ class ServiceThread:
         thread.daemon = True  # Daemonize thread
         thread.start()  # Start the execution
         
-    def serviceThreadCallback(__X,val):
-        self.piBoardCallback(val)
 
-
-def ext_callback(val):
+def ext_callback(_event):
     print "ext_callback"
-    print val        
+    print _event.channel       
+    print _event.edge       
+    print _event.eventCallback
+
                 
 if __name__ == '__main__': 
      
