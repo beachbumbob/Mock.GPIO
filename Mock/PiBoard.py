@@ -32,13 +32,13 @@ class Board:
     def piBoardCallback(_piBoardInstance, _value):
         
         global channelEvents
-        # This assumes that val is in format {channel:[HI|LOW]}, i.e. 22:HI
+        # This assumes that _value is in format {channel:[HI|LOW]}, i.e. 22:HI
         values = _value.split(":")
         channel = values[0]
         edge = values[1]
         
         event = _piBoardInstance.channelEvents[int(channel)]
-        # TODO: Handle logic on wheter to call event callback or not.
+        # TODO: Handle logic on wether to call event callback or not.
         event.eventCallback(event)
     
     def setChannelConfig(_piBoardInstance, channel):
