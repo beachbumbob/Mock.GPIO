@@ -7,6 +7,8 @@ import logging
 import os
 # import yaml
 import PiBoard
+from __builtin__ import None
+from keyword import kwlist
 
 logger = logging.getLogger(__name__)
 
@@ -146,6 +148,68 @@ def wait_for_edge(channel,edge,bouncetime,timeout):
     [timeout]    - timeout in ms
     """
     board = getBoard()
+   
+    _gpio 
+#    unsigned int gpio;
+#    int channel, edge, result;
+    _channel
+    _edge
+#    bouncetime = -666; // None
+    _bouncetime = None
+#    int timeout = -1; // None
+    _timeout = None
+
+#     static char *kwlist[] = {"channel", "edge", "bouncetime", "timeout", None}
+    _kwlist = {}
+    _kwlist[0] = "channel"
+    _kwlist[1] = "edge"
+    _kwlist[2] = "bouncetime"
+    _kwlist[3] = "timeout"
+    _kwlist[4] = None
+
+    if (!PyArg_ParseTupleAndKeywords(args, _kwargs, "ii|ii", _kwlist, &_channel, &_edge, &_bouncetime, &_timeout))
+        return None
+
+      if (get_gpio_number(_channel, &_gpio))
+        return None
+
+    // check channel is setup as an input
+    if (gpio_direction[gpio] != INPUT)
+        PyErr_SetString(PyExc_RuntimeError, "You must setup() the GPIO channel as an input first")
+        return None
+   
+
+   // is edge a valid value?
+    _edge -= PY_EVENT_CONST_OFFSET
+    if (_edge != RISING_EDGE && _edge != FALLING_EDGE && _edge != BOTH_EDGE)
+        PyErr_SetString(PyExc_ValueError, "The edge must be set to RISING, FALLING or BOTH")
+        return None
+
+    if (_bouncetime <= 0 && _bouncetime != None)
+        PyErr_SetString(PyExc_ValueError, "Bouncetime must be greater than 0")
+        return None
+
+    if (_timeout <= 0 && _timeout != None)
+        PyErr_SetString(PyExc_ValueError, "Timeout must be greater than 0")
+        return None
+    
+    if (check_gpio_priv())
+        return None
+
+    Py_BEGIN_ALLOW_THREADS // disable GIL
+    _result = blocking_wait_for_edge(_gpio, _edge, _bouncetime, _timeout)
+    Py_END_ALLOW_THREADS   // enable GIL
+
+    if (_result == 0)
+      return None
+    else if (_result == -1)
+      PyErr_SetString(PyExc_RuntimeError, "Conflicting edge detection events already exist for this GPIO channel")
+      return None
+    else if (_result == -2)
+      PyErr_SetString(PyExc_RuntimeError, "Error waiting for edge")
+      return None
+    else
+      return Py_BuildValue("i", _channel)
     
     logger.info("waiting for edge : {} on channel : {} with bounce time : {} and Timeout :{}".format(edge,channel,bouncetime,timeout))
 
