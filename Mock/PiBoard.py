@@ -1,15 +1,19 @@
 import threading
 import time
-
-import GPIO as GPIO
 import socket as sk
+import GPIO
 
 
 class Board:
-    channelConfigs = None
-    channelEvents = None
+    channelConfigs = {}
+    channelEvents = {}
+    gpio_direction = {}
     __instance = None
     serviceThread = None
+    pin_to_gpio_rev1 = {-1, -1, -1, 0, -1, 1, -1, 4, 14, -1, 15, 17, 18, 21, -1, 22, 23, -1, 24, 10, -1, 9, 25, 11, 8, -1, 7, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 }
+    pin_to_gpio_rev2 = {-1, -1, -1, 2, -1, 3, -1, 4, 14, -1, 15, 17, 18, 27, -1, 22, 23, -1, 24, 10, -1, 9, 25, 11, 8, -1, 7, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 }
+    pin_to_gpio_rev3 = {-1, -1, -1, 2, -1, 3, -1, 4, 14, -1, 15, 17, 18, 27, -1, 22, 23, -1, 24, 10, -1, 9, 25, 11, 8, -1, 7, -1, -1, 5, -1, 6, 12, 13, -1, 19, 16, 26, 20, -1, 21 }
+
     
     @staticmethod 
     def getInstance():
@@ -23,11 +27,24 @@ class Board:
             raise Exception("This class is a singleton!")
         else:
             Board.__instance = self
-            Board.__instance.channelEvents = {}
-            Board.__instance.channelConfigs = {}
-            Board.__instance.serviceThread = ServiceThread()
-            Board.__instance.serviceThread.setPiBoardCallback(Board.__instance.piBoardCallback)
-            Board.__instance.serviceThread.threadify()
+        
+            i = 0 
+            while i < 54:
+                Board.__instance.gpio_direction[i] = -1
+                i += 1
+        '''    
+        if Board.__instance.rpiinfo.p1_revision == 1:
+            Board.__instance.pin_to_gpio = Board.__instance.pin_to_gpio_rev1
+        elif Board.__instance.rpiinfo.p1_revision == 2:
+            Board.__instance.pin_to_gpio = Board.__instance.pin_to_gpio_rev2
+        else # assume model B+ or A+ or 2B
+        '''
+        # Based on GPIO.RPI_REVISION = 3
+        Board.__instance.pin_to_gpio = Board.__instance.pin_to_gpio_rev3
+                    
+        Board.__instance.serviceThread = ServiceThread()
+        Board.__instance.serviceThread.setPiBoardCallback(Board.__instance.piBoardCallback)
+        Board.__instance.serviceThread.threadify()
            
     def piBoardCallback(_piBoardInstance, _value):
         
@@ -37,9 +54,27 @@ class Board:
         channel = values[0]
         edge = values[1]
         
+        _dir = Board.__instance.gpio_direction[int(channel)]
+        
+        if not _dir == -1 and  not _dir == GPIO.IN:
+            raise ValueError("Wrong direction for " + channel)
+        
+        edge_dec = -1
+        
+        if edge == "LOW":
+            edge_dec = 0
+        elif edge == "HI":
+            edge_dec = 1
+        else:
+            raise ValueError("Edge must be either HI or LOW")
+        
         event = _piBoardInstance.channelEvents[int(channel)]
+        cc = _piBoardInstance.channelConfigs[int(channel)]        
         # TODO: Handle logic on wether to call event callback or not.
-        event.eventCallback(event)
+        if not int(cc.current) == edge_dec:
+            cc.current = edge_dec
+            _piBoardInstance.channelConfigs[int(channel)] = cc
+            event.eventCallback(event)
     
     def setChannelConfig(_piBoardInstance, channel):
         if channel != None:
@@ -135,14 +170,40 @@ def ext_callback(_event):
     print _event.edge       
     print _event.eventCallback
 
-                
+
+
+
+### Only for testing
+
+
+def getBoard():
+    _rpib = Board.getInstance()
+    if _rpib == None:
+        _rpib = Board()
+    return _rpibget_gpio_number
+
+class Channel:
+    def __init__(self,channel, direction, initial=0,pull_up_down=0):
+        self.chanel = channel
+        self.direction = direction
+        self.initial = initial
+        self.current = initial
+        self.pull_up_down = pull_up_down
+
+           
 if __name__ == '__main__': 
      
     try:
         while True:
-            GPIO.setmode(GPIO.BCM)
-            GPIO.setup(22, GPIO.IN, 0, GPIO.PUD_UP)
-            GPIO.add_event_detect(22, GPIO.FALLING, ext_callback, bouncetime=1500)
+            
+#             GPIO.setmode(GPIO.BCM)
+#             GPIO.setup(22, GPIO.IN, 0, GPIO.PUD_UP)
+#             GPIO.add_event_detect(22, GPIO.FALLING, ext_callback, bouncetime=1500)
+            
+            
+            rpib = getBoard()
+            rpib.setChannelConfig(Channel(22, 32, 0, 0))
+            rpib.setChannelEvent(22, 32, ext_callback)
             time.sleep(1000)
     except KeyboardInterrupt:
         pass      

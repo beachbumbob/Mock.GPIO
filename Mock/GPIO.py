@@ -2,13 +2,13 @@
 Mock Library for RPi.GPIO
 """
 
-import time
 import logging
 import os
+import time
+import types
 # import yaml
+
 import PiBoard
-from __builtin__ import None
-from keyword import kwlist
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +43,7 @@ I2C = 42
 IN = 1
 LOW = 0
 OUT = 0
+INPUT = 1
 PUD_DOWN = 21
 PUD_OFF = 20
 PUD_UP = 22
@@ -53,7 +54,31 @@ SERIAL = 40
 SPI = 41
 UNKNOWN = -1
 VERSION = '0.7.0'
+PY_EVENT_CONST_OFFSET = 30
 
+BCM2708_PERI_BASE_DEFAULT = 0x20000000
+BCM2709_PERI_BASE_DEFAULT = 0x3f000000
+GPIO_BASE_OFFSET = 0x200000
+FSEL_OFFSET = 0  # 0x0000
+SET_OFFSET = 7  # 0x001c / 4
+CLR_OFFSET = 10  # 0x0028 / 4
+PINLEVEL_OFFSET = 13  # 0x0034 / 4
+EVENT_DETECT_OFFSET = 16  # 0x0040 / 4
+RISING_ED_OFFSET = 19  # 0x004c / 4
+FALLING_ED_OFFSET = 22  # 0x0058 / 4
+HIGH_DETECT_OFFSET = 25  # 0x0064 / 4
+LOW_DETECT_OFFSET = 28  # 0x0070 / 4
+PULLUPDN_OFFSET = 37  # 0x0094 / 4
+PULLUPDNCLK_OFFSET = 38  # 0x0098 / 4
+PULLUPDN_OFFSET_2711_0 = 57
+PULLUPDN_OFFSET_2711_1 = 58
+PULLUPDN_OFFSET_2711_2 = 59
+PULLUPDN_OFFSET_2711_3 = 60
+
+NO_EDGE      = 0
+RISING_EDGE  = 1
+FALLING_EDGE = 2
+BOTH_EDGE    = 3
 _mode = 0
 
 channel_config = {}
@@ -120,6 +145,7 @@ def setup(channel, direction, initial=0,pull_up_down=PUD_OFF):
     global channel_config
     channel_config[channel] = Channel(channel, direction, initial, pull_up_down)
     board.setChannelConfig(channel_config[channel])
+    board.gpio_direction[channel] = direction
 
 def output(channel, value):
     """
@@ -167,49 +193,45 @@ def wait_for_edge(channel,edge,bouncetime,timeout):
     _kwlist[3] = "timeout"
     _kwlist[4] = None
 
-    if (!PyArg_ParseTupleAndKeywords(args, _kwargs, "ii|ii", _kwlist, &_channel, &_edge, &_bouncetime, &_timeout))
-        return None
-
-      if (get_gpio_number(_channel, &_gpio))
-        return None
-
-    // check channel is setup as an input
-    if (gpio_direction[gpio] != INPUT)
-        PyErr_SetString(PyExc_RuntimeError, "You must setup() the GPIO channel as an input first")
-        return None
-   
-
-   // is edge a valid value?
-    _edge -= PY_EVENT_CONST_OFFSET
-    if (_edge != RISING_EDGE && _edge != FALLING_EDGE && _edge != BOTH_EDGE)
-        PyErr_SetString(PyExc_ValueError, "The edge must be set to RISING, FALLING or BOTH")
-        return None
-
-    if (_bouncetime <= 0 && _bouncetime != None)
-        PyErr_SetString(PyExc_ValueError, "Bouncetime must be greater than 0")
-        return None
-
-    if (_timeout <= 0 && _timeout != None)
-        PyErr_SetString(PyExc_ValueError, "Timeout must be greater than 0")
+    if not PyArg_ParseTupleAndKeywords(args, _kwargs, "ii|ii", _kwlist, _channel, _edge, _bouncetime, _timeout):
         return None
     
-    if (check_gpio_priv())
+    # TODO verify this
+    _get_gpio_numbers = get_gpio_number(_channel, _gpio).split(":")
+    _gpio = int(_get_gpio_numbers[1])
+    if int(_get_gpio_numbers[0]) == 0:
         return None
 
-    Py_BEGIN_ALLOW_THREADS // disable GIL
-    _result = blocking_wait_for_edge(_gpio, _edge, _bouncetime, _timeout)
-    Py_END_ALLOW_THREADS   // enable GIL
+#     check channel is setup as an input
+    
+    if not board.gpio_direction[_gpio] == INPUT:
+        raise RuntimeError("You must setup() the GPIO channel as an input first")
+        return None
 
-    if (_result == 0)
-      return None
-    else if (_result == -1)
-      PyErr_SetString(PyExc_RuntimeError, "Conflicting edge detection events already exist for this GPIO channel")
-      return None
-    else if (_result == -2)
-      PyErr_SetString(PyExc_RuntimeError, "Error waiting for edge")
-      return None
-    else
-      return Py_BuildValue("i", _channel)
+#    // is edge a valid value?
+    _edge -= PY_EVENT_CONST_OFFSET
+    if not _edge == RISING_EDGE and not _edge == FALLING_EDGE and _edge == BOTH_EDGE:
+        raise ValueError("The edge must be set to RISING, FALLING or BOTH")
+        return None
+
+    if _bouncetime <= 0 and not _bouncetime == None:
+        raise ValueError("Bouncetime must be greater than 0")
+        return None
+
+    if _timeout <= 0 and not _timeout != None:
+        raise ValueError("Timeout must be greater than 0")
+        return None
+    
+    if _result == 0:
+        return None
+    elif _result == -1:
+        raise RuntimeError("Conflicting edge detection events already exist for this GPIO channel")
+        return None
+    elif _result == -2:
+        raise RuntimeError("Error waiting for edge")
+        return None
+    else:
+        return Py_BuildValue("i", _channel)
     
     logger.info("waiting for edge : {} on channel : {} with bounce time : {} and Timeout :{}".format(edge,channel,bouncetime,timeout))
 
@@ -222,7 +244,6 @@ def add_event_detect(channel,edge,callback,bouncetime):
     [callback]   - A callback function for the event (optional)
     [bouncetime] - Switch bounce timeout in ms for callback
     """
-#     board = 
     getBoard().setChannelEvent(channel, edge, callback)
     logger.info("Event detect added for edge : {} on channel : {} with bouce time : {} and callback {}".format(edge,channel,bouncetime,callback))
 
@@ -317,12 +338,33 @@ def cleanup(channel=None):
     board = getBoard()
     if channel is not None:
         logger.info("Cleaning Up Channel : {}".format(channel))
+        setup_gpio(channel, INPUT, PUD_OFF)
+        board.gpio_direction[channel] = -1
+        found = 1
     else:
         logger.info("Cleaning Up all channels")
+        i = 0 
+        while i < 54:
+            if not board.gpio_direction[i] == -1:
+                setup_gpio(i, INPUT, PUD_OFF)
+                board.gpio_direction[i] = -1
+                found = 1
+            i += 1
+      
         
 def getBoard():
     rpib = PiBoard.Board.getInstance()
     if rpib == None:
         rpib = PiBoard.Board()
     return rpib
-   
+
+
+def get_gpio_number(_channel, _gpio):
+    '''
+    Will only work with BCM
+    
+    '''
+    return "0" + ":" + str(_channel)
+
+
+    
