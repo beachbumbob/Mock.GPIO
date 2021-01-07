@@ -143,9 +143,23 @@ def setup(channel, direction, initial=0,pull_up_down=PUD_OFF):
     logger.info("setup channel : {} as {} with intial :{} and pull_up_dowm {}".format(channel,direction,initial,pull_up_down))
     board = getBoard()
     global channel_config
-    channel_config[channel] = Channel(channel, direction, initial, pull_up_down)
-    board.setChannelConfig(channel_config[channel])
-    board.gpio_direction[channel] = direction
+    
+    if isinstance(channel, list):
+        print("channel is list")
+        for c in channel:
+            print ("processing channel " + str(c)) 
+            channel_config[c] = Channel(c, direction, initial, pull_up_down)
+            board.setChannelConfig(channel_config[c])
+            board.gpio_direction[c] = direction   
+    elif isinstance(channel, int):
+        print("channel is int")
+        channel_config[channel] = Channel(channel, direction, initial, pull_up_down)
+        board.setChannelConfig(channel_config[channel])
+        board.gpio_direction[channel] = direction
+    else:
+        raise TypeError("channel is of wrong type: " + channel )    
+    
+    
 
 def output(channel, value):
     """
@@ -340,9 +354,15 @@ def cleanup(channel=None):
         logger.info("Cleaning Up Channel : {}".format(channel))
         setup_gpio(channel, INPUT, PUD_OFF)
         board.gpio_direction[channel] = -1
+        board.channelConfigs[channel] = None
+        board.channelEvents[channel] = None
+
         found = 1
     else:
         logger.info("Cleaning Up all channels")
+        board.channelConfigs[channel] = {}
+        board.channelEvents = {}
+        
         i = 0 
         while i < 54:
             if not board.gpio_direction[i] == -1:
@@ -350,7 +370,8 @@ def cleanup(channel=None):
                 board.gpio_direction[i] = -1
                 found = 1
             i += 1
-      
+    board.cleanUp()
+  
         
 def getBoard():
     rpib = PiBoard.Board.getInstance()

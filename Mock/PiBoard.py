@@ -1,3 +1,4 @@
+from threading import ThreadError
 import threading
 import time
 import socket as sk
@@ -74,7 +75,7 @@ class Board:
         if not int(cc.current) == edge_dec:
             cc.current = edge_dec
             _piBoardInstance.channelConfigs[int(channel)] = cc
-            event.eventCallback(event)
+            event.eventCallback(event.channel)
     
     def setChannelConfig(_piBoardInstance, channel):
         if channel != None:
@@ -85,6 +86,18 @@ class Board:
         if _channel != None:
             event = Event(_edge, _channelEventCallback, _channel)
             _piBoardInstance.channelEvents[_channel] = event
+
+    def cleanUp(__X):
+        if len(Board.__instance.channelEvents) == 0 and len(Board.__instance.channelConfigs):
+            currThreadIdent = Board.__instance.serviceThread.thread.ident()
+            currThreadIdent = currThreadIdent + "kill"
+            t1 = thread_with_exception('Thread 1') 
+            t1.start() 
+            time.sleep(2) 
+            t1.raise_exception() 
+            t1.join()
+            if Board.__instance.serviceThread.thread.is_alive():
+                raise ThreadError("Failed to stop " + currThreadIdent)
 
 
 class Event:
@@ -111,7 +124,10 @@ class Service:
         serviceThreadCallback = _serviceThreadCallback
         connection = sk.socket(sk.AF_INET, sk.SOCK_STREAM)
         connection.setsockopt(sk.SOL_SOCKET, sk.SO_REUSEADDR, 1)
-        connection.bind(('0.0.0.0', 5566))
+        try:
+            connection.bind(('0.0.0.0', 5566))
+        except socket.error:
+            return 0
         connection.listen(10)
         while True:
             current_connection, address = connection.accept()
@@ -180,7 +196,7 @@ def getBoard():
     _rpib = Board.getInstance()
     if _rpib == None:
         _rpib = Board()
-    return _rpibget_gpio_number
+    return _rpib
 
 class Channel:
     def __init__(self,channel, direction, initial=0,pull_up_down=0):
@@ -205,5 +221,6 @@ if __name__ == '__main__':
             rpib.setChannelConfig(Channel(22, 32, 0, 0))
             rpib.setChannelEvent(22, 32, ext_callback)
             time.sleep(1000)
+            #rpib.cleanUp()
     except KeyboardInterrupt:
         pass      
