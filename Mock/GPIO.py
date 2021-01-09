@@ -169,6 +169,7 @@ def output(channel, value):
 
     """
     board = getBoard()
+    board.logToFile(channel,value)
     logger.info("output channel : {} with value : {}".format(channel, value))
 
 def input(channel):
